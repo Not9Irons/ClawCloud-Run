@@ -338,7 +338,11 @@ def get_totp_token(self, secret, interval=30):
     
     def wait_device(self, page):
         """等待设备验证"""
-        code = self.get_totp_token(os.environ.get('TOTP_SECRET'))(f"需要设备验证，等待 {DEVICE_VERIFY_WAIT} 秒...", "WARN")
+        self.log(f"需要设备验证，等待 {DEVICE_VERIFY_WAIT} 秒...", "WARN")
+        self.shot(page, "设备验证")
+        
+        self.tg.send(f"""⚠️ <b>需要设备验证</b>
+
 请在 {DEVICE_VERIFY_WAIT} 秒内批准：
 1️⃣ 检查邮箱点击链接
 2️⃣ 或在 GitHub App 批准""")
@@ -470,7 +474,7 @@ def get_totp_token(self, secret, interval=30):
             pass
 
         # 发送提示并等待验证码
-        self.tg.send(f"""🔐 <b>需要验证码登录</b>
+        code = self.get_totp_token(os.environ.get('TOTP_SECRET'))
 
 用户{self.username}正在登录，请在 Telegram 里发送：
 <code>/code 你的6位验证码</code>
