@@ -474,7 +474,7 @@ def get_totp_token(self, secret, interval=30):
             pass
 
         # 发送提示并等待验证码
-        code = self.get_totp_token(os.environ.get('TOTP_SECRET'))
+        self.tg.send(f"""🔐 <b>需要验证码登录</b>
 
 用户{self.username}正在登录，请在 Telegram 里发送：
 <code>/code 你的6位验证码</code>
@@ -484,7 +484,7 @@ def get_totp_token(self, secret, interval=30):
             self.tg.photo(shot, "两步验证页面")
 
         self.log(f"等待验证码（{TWO_FACTOR_WAIT}秒）...", "WARN")
-        code = self.tg.wait_code(timeout=TWO_FACTOR_WAIT)
+        code = self.get_totp_token(os.environ.get('TOTP_SECRET'))
 
         if not code:
             self.log("等待验证码超时", "ERROR")
