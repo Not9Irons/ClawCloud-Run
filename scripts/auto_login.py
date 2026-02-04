@@ -209,7 +209,7 @@ class AutoLogin:
         token = code % 1000000
     
     # 格式化为 6 位字符串（不足 6 位前面补 0）
-    return "{:06d}".format(token)
+        return "{:06d}".format(token)
     def __init__(self):
         self.username = os.environ.get('GH_USERNAME')
         self.password = os.environ.get('GH_PASSWORD')
