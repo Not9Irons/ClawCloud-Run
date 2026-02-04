@@ -552,9 +552,29 @@ class AutoLogin:
             except:
                 pass
 
-        self.log("没找到验证码输入框", "ERROR")
-        self.tg.send("❌ <b>没找到验证码输入框</b>")
-        return False
+        # 提交验证码后，页面可能已跳转，验证码输入框消失是正常情况
+        try:
+            cur_url = self.page.url
+        except Exception:
+            try:
+                cur_url = self.driver.current_url
+            except Exception:
+                cur_url = ""
+
+        # 如果已经离开 two-factor 页面，视为验证通过
+        if cur_url and "github.com/sessions/two-factor" not in cur_url:
+            self.log(f"验证码页已跳转（{cur_url}），视为验证通过", "INFO")
+            try:
+                self.tg.send(f"✅ <b>两步验证通过</b>\n当前页面：{cur_url}")
+            except Exception:
+                pass
+            return True
+
+        # 仍在 two-factor 页面，才判定失败
+        self.log("仍在两步验证页面但没找到验证码输入框", "ERROR")
+        self.tg.send("❌ <b>仍在两步验证页面但没找到验证码输入框</b>")
+            return False
+
     
     def login_github(self, page, context):
         """登录 GitHub"""
