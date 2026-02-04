@@ -187,7 +187,7 @@ class AutoLogin:
     # 如果密钥长度不是8的倍数，需要补全 padding (Base32 要求)
         missing_padding = len(secret) % 8
         if missing_padding != 0:
-        secret += '=' * (8 - missing_padding)
+            secret += '=' * (8 - missing_padding)
         key = base64.b32decode(secret)
     
     # 3. 计算时间计数器 (当前时间戳 / 时间步长)
