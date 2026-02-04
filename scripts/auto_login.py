@@ -175,7 +175,43 @@ class SecretUpdater:
 
 class AutoLogin:
     """自动登录"""
+import hmac
+import base64
+import struct
+import hashlib
+import time
+
+def get_totp_token(self, secret, interval=30):
+    # 1. 确保密钥是大写的，并且移除空格（Base32 格式要求）
+    secret = secret.upper().replace(" ", "")
     
+    # 2. 对密钥进行 Base32 解码
+    # 如果密钥长度不是8的倍数，需要补全 padding (Base32 要求)
+    missing_padding = len(secret) % 8
+    if missing_padding != 0:
+        secret += '=' * (8 - missing_padding)
+    key = base64.b32decode(secret)
+    
+    # 3. 计算时间计数器 (当前时间戳 / 时间步长)
+    # TOTP 算法要求是一个 8 字节的大端序整数
+    counter = int(time.time() / interval)
+    msg = struct.pack(">Q", counter)
+    
+    # 4. 使用 HMAC-SHA1 计算哈希
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    
+    # 5. 动态截断 (Dynamic Truncation)
+    # 取哈希值的最后一个字节的低 4 位作为偏移量
+    offset = digest[19] & 0xf
+    
+    # 从偏移量开始取 4 个字节，通过位运算去掉最高位（符号位），生成一个 31 位的整数
+    code = (struct.unpack(">I", digest[offset:offset+4])[0] & 0x7fffffff)
+    
+    # 6. 取模运算得到 6 位数字
+    token = code % 1000000
+    
+    # 格式化为 6 位字符串（不足 6 位前面补 0）
+    return "{:06d}".format(token)
     def __init__(self):
         self.username = os.environ.get('GH_USERNAME')
         self.password = os.environ.get('GH_PASSWORD')
@@ -187,8 +223,8 @@ class AutoLogin:
         self.n = 0
         
         # 区域相关
-        self.detected_region = 'eu-central-1'  # 检测到的区域，如 "ap-southeast-1"
-        self.region_base_url = 'https://eu-central-1.run.claw.cloud'  # 检测到的区域基础 URL
+        self.detected_region = 'ap-southeast-1.run.claw.cloud'  # 检测到的区域，如 "ap-southeast-1"
+        self.region_base_url = 'https://ap-southeast-1.run.claw.cloud/'  # 检测到的区域基础 URL
         
     def log(self, msg, level="INFO"):
         icons = {"INFO": "ℹ️", "SUCCESS": "✅", "ERROR": "❌", "WARN": "⚠️", "STEP": "🔹"}
@@ -302,11 +338,7 @@ class AutoLogin:
     
     def wait_device(self, page):
         """等待设备验证"""
-        self.log(f"需要设备验证，等待 {DEVICE_VERIFY_WAIT} 秒...", "WARN")
-        self.shot(page, "设备验证")
-        
-        self.tg.send(f"""⚠️ <b>需要设备验证</b>
-
+        code = self.get_totp_token(os.environ.get('TOTP_SECRET'))(f"需要设备验证，等待 {DEVICE_VERIFY_WAIT} 秒...", "WARN")
 请在 {DEVICE_VERIFY_WAIT} 秒内批准：
 1️⃣ 检查邮箱点击链接
 2️⃣ 或在 GitHub App 批准""")
