@@ -573,7 +573,7 @@ class AutoLogin:
         # 仍在 two-factor 页面，才判定失败
         self.log("仍在两步验证页面但没找到验证码输入框", "ERROR")
         self.tg.send("❌ <b>仍在两步验证页面但没找到验证码输入框</b>")
-            return False
+        return False
 
     
     def login_github(self, page, context):
