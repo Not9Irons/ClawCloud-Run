@@ -179,8 +179,7 @@ class SecretUpdater:
 
 class AutoLogin:
     """自动登录"""
-
-def get_totp_token(self, secret, interval=30):
+    def get_totp_token(self, secret, interval=30):
     # 1. 确保密钥是大写的，并且移除空格（Base32 格式要求）
     secret = secret.upper().replace(" ", "")
     
