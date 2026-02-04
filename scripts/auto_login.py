@@ -23,7 +23,7 @@ from playwright.sync_api import sync_playwright
 PROXY_DSN = os.environ.get("PROXY_DSN", "").strip()
 
 # 固定登录入口，OAuth后会自动跳转到实际区域
-LOGIN_ENTRY_URL = "https://ap-southeast-1.run.claw.cloud/login"
+LOGIN_ENTRY_URL = "https://eu-central-1.run.claw.cloud/login"
 SIGNIN_URL = f"{LOGIN_ENTRY_URL}/signin"
 DEVICE_VERIFY_WAIT = 30  # Mobile验证 默认等 30 秒
 TWO_FACTOR_WAIT = int(os.environ.get("TWO_FACTOR_WAIT", "120"))  # 2FA验证 默认等 120 秒
@@ -175,43 +175,7 @@ class SecretUpdater:
 
 class AutoLogin:
     """自动登录"""
-import hmac
-import base64
-import struct
-import hashlib
-import time
-
-def get_totp_token(self, secret, interval=30):
-    # 1. 确保密钥是大写的，并且移除空格（Base32 格式要求）
-    secret = secret.upper().replace(" ", "")
     
-    # 2. 对密钥进行 Base32 解码
-    # 如果密钥长度不是8的倍数，需要补全 padding (Base32 要求)
-    missing_padding = len(secret) % 8
-    if missing_padding != 0:
-        secret += '=' * (8 - missing_padding)
-    key = base64.b32decode(secret)
-    
-    # 3. 计算时间计数器 (当前时间戳 / 时间步长)
-    # TOTP 算法要求是一个 8 字节的大端序整数
-    counter = int(time.time() / interval)
-    msg = struct.pack(">Q", counter)
-    
-    # 4. 使用 HMAC-SHA1 计算哈希
-    digest = hmac.new(key, msg, hashlib.sha1).digest()
-    
-    # 5. 动态截断 (Dynamic Truncation)
-    # 取哈希值的最后一个字节的低 4 位作为偏移量
-    offset = digest[19] & 0xf
-    
-    # 从偏移量开始取 4 个字节，通过位运算去掉最高位（符号位），生成一个 31 位的整数
-    code = (struct.unpack(">I", digest[offset:offset+4])[0] & 0x7fffffff)
-    
-    # 6. 取模运算得到 6 位数字
-    token = code % 1000000
-    
-    # 格式化为 6 位字符串（不足 6 位前面补 0）
-    return "{:06d}".format(token)
     def __init__(self):
         self.username = os.environ.get('GH_USERNAME')
         self.password = os.environ.get('GH_PASSWORD')
@@ -223,8 +187,8 @@ def get_totp_token(self, secret, interval=30):
         self.n = 0
         
         # 区域相关
-        self.detected_region = 'ap-southeast-1.run.claw.cloud'  # 检测到的区域，如 "ap-southeast-1"
-        self.region_base_url = 'https://ap-southeast-1.run.claw.cloud/'  # 检测到的区域基础 URL
+        self.detected_region = 'eu-central-1'  # 检测到的区域，如 "ap-southeast-1"
+        self.region_base_url = 'https://eu-central-1.run.claw.cloud'  # 检测到的区域基础 URL
         
     def log(self, msg, level="INFO"):
         icons = {"INFO": "ℹ️", "SUCCESS": "✅", "ERROR": "❌", "WARN": "⚠️", "STEP": "🔹"}
@@ -472,10 +436,60 @@ def get_totp_token(self, secret, interval=30):
                     pass
         except:
             pass
+import hmac
+import base64
+import struct
+import hashlib
+import time
 
+def get_totp_token(self, secret, interval=30):
+    # 1. 确保密钥是大写的，并且移除空格（Base32 格式要求）
+    secret = secret.upper().replace(" ", "")
+    
+    # 2. 对密钥进行 Base32 解码
+    # 如果密钥长度不是8的倍数，需要补全 padding (Base32 要求)
+    missing_padding = len(secret) % 8
+    if missing_padding != 0:
+        secret += '=' * (8 - missing_padding)
+    key = base64.b32decode(secret)
+    
+    # 3. 计算时间计数器 (当前时间戳 / 时间步长)
+    # TOTP 算法要求是一个 8 字节的大端序整数
+    counter = int(time.time() / interval)
+    msg = struct.pack(">Q", counter)
+    
+    # 4. 使用 HMAC-SHA1 计算哈希
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    
+    # 5. 动态截断 (Dynamic Truncation)
+    # 取哈希值的最后一个字节的低 4 位作为偏移量
+    offset = digest[19] & 0xf
+    
+    # 从偏移量开始取 4 个字节，通过位运算去掉最高位（符号位），生成一个 31 位的整数
+    code = (struct.unpack(">I", digest[offset:offset+4])[0] & 0x7fffffff)
+    
+    # 6. 取模运算得到 6 位数字
+    token = code % 1000000
+    
+    # 格式化为 6 位字符串（不足 6 位前面补 0）
+    return "{:06d}".format(token)
         # 发送提示并等待验证码
+        self.tg.send(f"""🔐 <b>需要验证码登录</b>
 
+用户{self.username}正在登录，请在 Telegram 里发送：
+<code>/code 你的6位验证码</code>
+
+等待时间：{TWO_FACTOR_WAIT} 秒""")
+        if shot:
+            self.tg.photo(shot, "两步验证页面")
+
+        self.log(f"等待验证码（{TWO_FACTOR_WAIT}秒）...", "WARN")
         code = self.get_totp_token(os.environ.get('TOTP_SECRET'))
+
+        if not code:
+            self.log("等待验证码超时", "ERROR")
+            self.tg.send("❌ <b>等待验证码超时</b>")
+            return False
 
         # 不打印验证码明文，只提示收到
         self.log("收到验证码，正在填入...", "SUCCESS")
